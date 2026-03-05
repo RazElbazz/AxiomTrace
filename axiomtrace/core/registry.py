@@ -9,7 +9,7 @@ from __future__ import annotations
 from axiomtrace.collectors.base import BaseCollector
 from axiomtrace.collectors.system.usn_journal import UsnJournalCollector
 from axiomtrace.collectors.system.prefetch import PrefetchCollector
-from axiomtrace.collectors.system.memory import MemoryCollector
+from axiomtrace.collectors.system.memory import PcaClientMemoryCollector
 from axiomtrace.collectors.system.disk import DiskCollector
 from axiomtrace.collectors.specialized.minecraft.mod_scanner import ModScannerCollector
 from axiomtrace.collectors.specialized.minecraft.macro_detector import MacroDetectorCollector
@@ -18,7 +18,7 @@ from axiomtrace.collectors.specialized.minecraft.process_inspector import Proces
 SYSTEM_COLLECTORS: list[type[BaseCollector]] = [
     UsnJournalCollector,
     PrefetchCollector,
-    MemoryCollector,
+    PcaClientMemoryCollector,
     DiskCollector,
 ]
 
