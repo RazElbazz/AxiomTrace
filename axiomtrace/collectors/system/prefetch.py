@@ -4,6 +4,8 @@ Parses Prefetch (.pf) files to determine application execution history,
 run counts, and timestamps.
 """
 
+from __future__ import annotations
+
 from axiomtrace.collectors.base import Artifact, SystemCollector
 
 

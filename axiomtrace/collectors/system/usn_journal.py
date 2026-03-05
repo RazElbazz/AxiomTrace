@@ -4,6 +4,8 @@ Reads the NTFS USN Journal to discover file creation, deletion, and
 modification events that may indicate artifact tampering.
 """
 
+from __future__ import annotations
+
 from axiomtrace.collectors.base import Artifact, SystemCollector
 
 

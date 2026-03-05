@@ -5,6 +5,8 @@ anomalies such as timestamp manipulation tools, anti-forensic
 utilities, and process injection frameworks.
 """
 
+from __future__ import annotations
+
 from axiomtrace.signatures.base import Signature, SignatureType
 
 SYSTEM_SIGNATURES: list[Signature] = [

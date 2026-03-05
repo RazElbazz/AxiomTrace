@@ -4,6 +4,8 @@ Enumerates and inspects process memory regions for anomalous patterns
 such as injected code, hollowed sections, or unsigned executable pages.
 """
 
+from __future__ import annotations
+
 from axiomtrace.collectors.base import Artifact, SystemCollector
 
 

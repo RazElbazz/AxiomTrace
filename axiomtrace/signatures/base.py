@@ -4,6 +4,8 @@ Signatures are pure data: they describe *what* to look for.
 Parsers contain the *logic* for how to match them against collected artifacts.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 

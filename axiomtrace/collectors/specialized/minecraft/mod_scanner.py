@@ -5,6 +5,8 @@ identify unauthorized modifications, known cheat clients, or
 tampered mod files.
 """
 
+from __future__ import annotations
+
 from axiomtrace.collectors.base import Artifact, SpecializedCollector
 
 

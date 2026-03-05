@@ -4,6 +4,8 @@ Scans disk-level metadata including MFT records, alternate data streams,
 and filesystem timestamps for evidence of artifact manipulation.
 """
 
+from __future__ import annotations
+
 from axiomtrace.collectors.base import Artifact, SystemCollector
 
 

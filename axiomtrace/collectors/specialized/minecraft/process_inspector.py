@@ -5,6 +5,8 @@ suspicious JVM agents, and integrity anomalies that indicate
 client-side tampering.
 """
 
+from __future__ import annotations
+
 from axiomtrace.collectors.base import Artifact, SpecializedCollector
 
 

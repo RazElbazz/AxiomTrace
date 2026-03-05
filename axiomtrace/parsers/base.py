@@ -4,6 +4,8 @@ Parsers contain the analysis *logic* - they take collected artifacts
 and match them against signatures to produce validation results.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 

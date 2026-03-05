@@ -4,6 +4,8 @@ Coordinates collector execution, feeds results into parsers, and
 aggregates final validation reports.
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 

@@ -4,6 +4,8 @@ Detects evidence of macro software, auto-clickers, and input automation
 tools that may compromise gameplay integrity.
 """
 
+from __future__ import annotations
+
 from axiomtrace.collectors.base import Artifact, SpecializedCollector
 
 

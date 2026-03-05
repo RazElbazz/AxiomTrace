@@ -5,6 +5,8 @@ indicators for known cheat clients, macro tools, and injection
 frameworks targeting Minecraft: Java Edition.
 """
 
+from __future__ import annotations
+
 from axiomtrace.signatures.base import Signature, SignatureType
 
 MINECRAFT_MOD_SIGNATURES: list[Signature] = [

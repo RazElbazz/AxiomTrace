@@ -9,11 +9,15 @@ description = "Forensic system integrity verification framework"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.scripts]
+axiomtrace = "axiomtrace.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "mypy>=1.0",
     "ruff>=0.4",
+    "pyinstaller>=6.0",
 ]
 
 [tool.ruff]

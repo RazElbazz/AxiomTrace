@@ -1,5 +1,7 @@
 """Logging configuration for AxiomTrace."""
 
+from __future__ import annotations
+
 import logging
 import sys
 
