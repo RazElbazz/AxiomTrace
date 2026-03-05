@@ -1,0 +1,1 @@
+"""Minecraft integrity verification collectors."""
