@@ -40,3 +40,6 @@ htmlcov/
 # Scan output
 output/*.json
 output/*.html
+
+temp.log
+temp.json
