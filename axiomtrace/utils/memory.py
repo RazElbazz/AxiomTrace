@@ -17,8 +17,13 @@ from axiomtrace.utils.winapi import (
     MEMORY_BASIC_INFORMATION,
     MBI_SIZE,
     MEM_COMMIT,
+    MEM_IMAGE,
+    PAGE_EXECUTE_READWRITE,
+    PAGE_EXECUTE_WRITECOPY,
     PAGE_GUARD,
     PAGE_NOACCESS,
+    PAGE_READWRITE,
+    PAGE_WRITECOPY,
     PROCESS_QUERY_INFORMATION,
     PROCESS_VM_READ,
     CloseHandle,
@@ -26,6 +31,10 @@ from axiomtrace.utils.winapi import (
     ReadProcessMemory,
     VirtualQueryEx,
 )
+
+# Writable page protections — heap/stack data lives here
+_WRITABLE_PAGES = (PAGE_READWRITE | PAGE_WRITECOPY |
+                   PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)
 
 log = logging.getLogger(__name__)
 
@@ -149,22 +158,41 @@ class ProcessMemoryReader:
         log.debug("Read %d memory regions from PID %d", len(regions), self.pid)
         return regions
 
-    def iter_regions(self, max_region_size: int = MAX_REGION_SIZE) -> Iterator[MemoryRegion]:
-        """Lazily yield committed, accessible memory regions one at a time."""
+    def iter_regions(
+        self,
+        max_region_size: int = MAX_REGION_SIZE,
+        min_region_size: int = 0,
+    ) -> Iterator[MemoryRegion]:
+        """Lazily yield committed, accessible memory regions one at a time.
+
+        Uses a pre-allocated reusable buffer to minimize allocations.
+
+        Args:
+            max_region_size: Skip regions larger than this.
+            min_region_size: Skip regions smaller than this.
+        """
         if not self._handle:
             raise RuntimeError("Process not opened. Call open() first.")
 
         address = 0
         mbi = MEMORY_BASIC_INFORMATION()
+        bytes_read = ctypes.c_size_t(0)
+
+        # Pre-allocate a reusable buffer (grown if needed)
+        buf_size = 1024 * 1024  # 1 MB initial
+        buf = (ctypes.c_char * buf_size)()
 
         while VirtualQueryEx(self._handle, address, ctypes.byref(mbi), MBI_SIZE):
             if (
                 mbi.State == MEM_COMMIT
                 and mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD) == 0
                 and mbi.RegionSize <= max_region_size
+                and mbi.RegionSize >= min_region_size
             ):
-                buf = (ctypes.c_char * mbi.RegionSize)()
-                bytes_read = ctypes.c_size_t(0)
+                # Grow buffer if needed
+                if mbi.RegionSize > buf_size:
+                    buf_size = mbi.RegionSize
+                    buf = (ctypes.c_char * buf_size)()
 
                 region_base = mbi.BaseAddress or 0
                 if ReadProcessMemory(
@@ -185,6 +213,77 @@ class ProcessMemoryReader:
             address = base + mbi.RegionSize
             if address <= base:
                 break
+
+    def iter_regions_pipelined(
+        self,
+        prefetch: int = 4,
+        skip_images: bool = True,
+    ) -> Iterator[MemoryRegion]:
+        """Yield regions with prefetched reads for overlapped I/O + scanning.
+
+        A background thread reads ahead while the caller processes regions.
+        ReadProcessMemory releases the GIL, so reading and scanning overlap.
+
+        Args:
+            prefetch: How many regions to read ahead (queue depth).
+            skip_images: Skip MEM_IMAGE regions (DLL/EXE code sections).
+        """
+        if not self._handle:
+            raise RuntimeError("Process not opened. Call open() first.")
+
+        from queue import Queue
+        from threading import Thread
+
+        queue: Queue[Optional[MemoryRegion]] = Queue(maxsize=prefetch)
+        handle = self._handle
+
+        def _reader() -> None:
+            address = 0
+            mbi = MEMORY_BASIC_INFORMATION()
+            bytes_read = ctypes.c_size_t(0)
+            buf_size = 1024 * 1024
+            buf = (ctypes.c_char * buf_size)()
+
+            while VirtualQueryEx(handle, address, ctypes.byref(mbi), MBI_SIZE):
+                if (
+                    mbi.State == MEM_COMMIT
+                    and mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD) == 0
+                    and mbi.RegionSize <= MAX_REGION_SIZE
+                    and (not skip_images or mbi.Type != MEM_IMAGE)
+                ):
+                    if mbi.RegionSize > buf_size:
+                        buf_size = mbi.RegionSize
+                        buf = (ctypes.c_char * buf_size)()
+
+                    region_base = mbi.BaseAddress or 0
+                    if ReadProcessMemory(
+                        handle, region_base, buf, mbi.RegionSize,
+                        ctypes.byref(bytes_read),
+                    ):
+                        queue.put(MemoryRegion(
+                            base_address=region_base,
+                            size=bytes_read.value,
+                            protect=mbi.Protect,
+                            data=bytes(buf[: bytes_read.value]),
+                        ))
+
+                base = mbi.BaseAddress or 0
+                address = base + mbi.RegionSize
+                if address <= base:
+                    break
+
+            queue.put(None)  # sentinel
+
+        thread = Thread(target=_reader, daemon=True)
+        thread.start()
+
+        while True:
+            region = queue.get()
+            if region is None:
+                break
+            yield region
+
+        thread.join()
 
     @staticmethod
     def regions_contain(regions: list[MemoryRegion], needle: bytes) -> bool:
