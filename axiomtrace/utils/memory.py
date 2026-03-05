@@ -11,7 +11,7 @@ import ctypes
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Iterator, Optional
 
 from axiomtrace.utils.winapi import (
     MEMORY_BASIC_INFORMATION,
@@ -148,6 +148,43 @@ class ProcessMemoryReader:
 
         log.debug("Read %d memory regions from PID %d", len(regions), self.pid)
         return regions
+
+    def iter_regions(self, max_region_size: int = MAX_REGION_SIZE) -> Iterator[MemoryRegion]:
+        """Lazily yield committed, accessible memory regions one at a time."""
+        if not self._handle:
+            raise RuntimeError("Process not opened. Call open() first.")
+
+        address = 0
+        mbi = MEMORY_BASIC_INFORMATION()
+
+        while VirtualQueryEx(self._handle, address, ctypes.byref(mbi), MBI_SIZE):
+            if (
+                mbi.State == MEM_COMMIT
+                and mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD) == 0
+                and mbi.RegionSize <= max_region_size
+            ):
+                buf = (ctypes.c_char * mbi.RegionSize)()
+                bytes_read = ctypes.c_size_t(0)
+
+                region_base = mbi.BaseAddress or 0
+                if ReadProcessMemory(
+                    self._handle,
+                    region_base,
+                    buf,
+                    mbi.RegionSize,
+                    ctypes.byref(bytes_read),
+                ):
+                    yield MemoryRegion(
+                        base_address=region_base,
+                        size=bytes_read.value,
+                        protect=mbi.Protect,
+                        data=bytes(buf[: bytes_read.value]),
+                    )
+
+            base = mbi.BaseAddress or 0
+            address = base + mbi.RegionSize
+            if address <= base:
+                break
 
     @staticmethod
     def regions_contain(regions: list[MemoryRegion], needle: bytes) -> bool:

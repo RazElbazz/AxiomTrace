@@ -61,27 +61,21 @@ class PcaClientMemoryCollector(SystemCollector):
                     continue
 
                 try:
-                    regions = reader.read_regions()
-
-                    # Fast pass: check raw bytes for any PcaClient marker
-                    found = False
-                    for needle in PCACLIENT_MARKERS:
-                        if reader.regions_contain(regions, needle):
-                            found = True
-                            break
-                    if not found:
-                        continue
-
-                    log.info(
-                        "Found PcaClient markers in %s PID %d",
-                        TARGET_PROCESS,
-                        proc.pid,
-                    )
-
-                    # Extract TRACE lines from ASCII data in memory
+                    # Stream regions lazily — stop as soon as we find TRACE data
                     seen: set[str] = set()
-                    for region in regions:
-                        for match in _TRACE_LINE_RE.finditer(region.data):
+                    for region in reader.iter_regions():
+                        matches = list(_TRACE_LINE_RE.finditer(region.data))
+                        if not matches:
+                            continue
+
+                        log.info(
+                            "Found PcaClient TRACE data in %s PID %d at %s",
+                            TARGET_PROCESS,
+                            proc.pid,
+                            hex(region.base_address),
+                        )
+
+                        for match in matches:
                             try:
                                 full_line = match.group().decode("ascii", errors="replace")
                                 tail = match.group(1).decode("ascii", errors="replace")
@@ -122,6 +116,9 @@ class PcaClientMemoryCollector(SystemCollector):
                                 )
                             )
 
+                        # All PcaClient data is in one contiguous block — stop scanning
+                        break
+
                     log.info(
                         "Collected %d unique executable paths from PID %d",
                         len(seen),
@@ -140,10 +137,13 @@ class PcaClientMemoryCollector(SystemCollector):
 
 
 if __name__ == "__main__":
+    import time
+
     from axiomtrace.utils.logging import setup_logging
     from axiomtrace.utils.memory import ProcessMemoryReader
 
     setup_logging(logging.DEBUG)
+    t_start = time.perf_counter()
 
     if not enable_debug_privilege():
         print("Failed to enable SeDebugPrivilege. Are you running as admin?")
@@ -158,39 +158,17 @@ if __name__ == "__main__":
             print(f"  PID {proc.pid}: cannot open")
             continue
         try:
-            regions = reader.read_regions()
-            print(f"  PID {proc.pid}: {len(regions)} regions read")
-
-            # Search for PcaClient markers and dump surrounding ASCII text
-            for needle in PCACLIENT_MARKERS:
-                for region in regions:
-                    idx = region.data.find(needle)
-                    while idx != -1:
-                        # Find the start/end of the text block around the hit
-                        start = max(0, idx - 500)
-                        end = min(len(region.data), idx + len(needle) + 4000)
-                        chunk = region.data[start:end]
-
-                        # Decode as ASCII (the PcaClient data is plain ASCII)
-                        text = chunk.decode("ascii", errors="replace")
-
-                        print(f"\n--- Hit at {hex(region.base_address + idx)} (needle: {needle!r}) ---")
-                        # Print each non-empty line
-                        for line in text.splitlines():
-                            stripped = line.strip()
-                            if stripped and "TRACE" in stripped:
-                                print(stripped)
-                        print("---")
-
-                        idx = region.data.find(needle, idx + len(needle))
-
-            # Also run the TRACE regex to show parsed results
-            print(f"\n{'='*60}")
-            print(f"Parsed TRACE entries from PID {proc.pid}:")
-            print(f"{'='*60}")
+            # Stream regions lazily — stop at first region with TRACE data
             seen: set[str] = set()
-            for region in regions:
-                for match in _TRACE_LINE_RE.finditer(region.data):
+            regions_scanned = 0
+            for region in reader.iter_regions():
+                regions_scanned += 1
+                matches = list(_TRACE_LINE_RE.finditer(region.data))
+                if not matches:
+                    continue
+
+                print(f"  PID {proc.pid}: found TRACE data at region {hex(region.base_address)} (scanned {regions_scanned} regions)")
+                for match in matches:
                     try:
                         line = match.group().decode("ascii", errors="replace")
                     except Exception:
@@ -199,7 +177,14 @@ if __name__ == "__main__":
                         continue
                     seen.add(line.lower())
                     print(line)
-            print(f"\nTotal unique TRACE entries: {len(seen)}")
+                break  # all PcaClient data is in one block
+
+            elapsed = time.perf_counter() - t_start
+            if seen:
+                print(f"\nTotal unique TRACE entries: {len(seen)}")
+            else:
+                print("  No PcaClient TRACE entries found")
+            print(f"Completed in {elapsed:.2f}s")
 
         finally:
             reader.close()
