@@ -70,11 +70,9 @@ def list_collectors() -> None:
 def _is_admin() -> bool:
     """Check if the process is running with administrator privileges."""
     try:
-        return ctypes.windll.kernel32.IsUserAnAdmin() != 0  # type: ignore[union-attr]
-    except AttributeError:
-        # Non-Windows fallback: check for root (uid 0)
-        import os
-        return os.getuid() == 0
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0  # type: ignore[union-attr]
+    except (AttributeError, OSError):
+        return False
 
 
 def main(argv: list[str] | None = None) -> int:
