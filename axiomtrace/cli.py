@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import logging
 import sys
 from pathlib import Path
@@ -66,12 +67,27 @@ def list_collectors() -> None:
             print(f"  {instance.name:<35} {instance.description}")
 
 
+def _is_admin() -> bool:
+    """Check if the process is running with administrator privileges."""
+    try:
+        return ctypes.windll.kernel32.IsUserAnAdmin() != 0  # type: ignore[union-attr]
+    except AttributeError:
+        # Non-Windows fallback: check for root (uid 0)
+        import os
+        return os.getuid() == 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     if args.list_collectors:
         list_collectors()
         return 0
+
+    if not _is_admin():
+        print("ERROR: AxiomTrace requires administrator privileges.")
+        print("Please re-run this program as Administrator.")
+        return 1
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     setup_logging(log_level)
