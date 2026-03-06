@@ -201,35 +201,6 @@ if __name__ == "__main__":
 
         for region in reader.iter_regions_pipelined(skip_images=False):
             regions_scanned += 1
-
-            # Diagnostic: dump raw context around any needle hit
-            for needle in [_NEEDLE_TCP, _NEEDLE_UDP, _NEEDLE_TCP_WIDE, _NEEDLE_UDP_WIDE]:
-                pos = 0
-                while True:
-                    idx2 = region.data.find(needle, pos)
-                    if idx2 == -1:
-                        break
-                    # Grab 200 bytes around the hit
-                    start = max(0, idx2 - 20)
-                    end = min(len(region.data), idx2 + 200)
-                    chunk = region.data[start:end]
-                    addr = hex(region.base_address + idx2)
-                    # Try ASCII decode
-                    try:
-                        text = chunk.decode("ascii", errors="replace")
-                    except Exception:
-                        text = repr(chunk[:100])
-                    # Also try UTF-16LE
-                    try:
-                        wide_text = chunk.decode("utf-16-le", errors="replace")
-                    except Exception:
-                        wide_text = ""
-                    print(f"\n  [HIT at {addr}] needle={needle[:20]}")
-                    print(f"    ASCII: {text!r}")
-                    if wide_text:
-                        print(f"    WIDE:  {wide_text!r}")
-                    pos = idx2 + len(needle)
-
             for idx, (needles, extractor, _) in enumerate(_SCANS):
                 if any(n in region.data for n in needles):
                     found = extractor(region, pid, seen_sets[idx])

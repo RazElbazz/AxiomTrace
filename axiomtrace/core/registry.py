@@ -10,6 +10,7 @@ from axiomtrace.collectors.base import BaseCollector
 from axiomtrace.collectors.system.usn_journal import UsnJournalCollector
 from axiomtrace.collectors.system.prefetch import PrefetchCollector
 from axiomtrace.collectors.system.memory.bfe import BfeMemoryCollector
+from axiomtrace.collectors.system.memory.cdpusersvc import CdpUserSvcMemoryCollector
 from axiomtrace.collectors.system.memory.explorer import ExplorerMemoryCollector
 from axiomtrace.collectors.system.memory.search_indexer import SearchIndexerMemoryCollector
 from axiomtrace.collectors.system.disk import DiskCollector
@@ -23,6 +24,7 @@ SYSTEM_COLLECTORS: list[type[BaseCollector]] = [
     ExplorerMemoryCollector,
     SearchIndexerMemoryCollector,
     BfeMemoryCollector,
+    CdpUserSvcMemoryCollector,
     DiskCollector,
 ]
 
