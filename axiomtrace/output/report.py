@@ -18,6 +18,15 @@ def to_dict(report: ScanReport) -> dict[str, Any]:
             "total_findings": len(report.results),
             "errors": len(report.errors),
         },
+        "artifacts": [
+            {
+                "source": a.source,
+                "category": a.category,
+                "description": a.description,
+                "metadata": a.metadata,
+            }
+            for a in report.artifacts
+        ],
         "findings": [
             {
                 "source": r.artifact.source,

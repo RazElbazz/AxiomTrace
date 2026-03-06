@@ -26,10 +26,8 @@ class Artifact:
     source: str
     category: str
     description: str
-    severity: ArtifactSeverity = ArtifactSeverity.INFO
     timestamp: datetime = field(default_factory=datetime.now)
     metadata: dict[str, Any] = field(default_factory=dict)
-    raw_data: bytes | None = None
 
 
 class BaseCollector(ABC):

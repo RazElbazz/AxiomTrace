@@ -107,6 +107,17 @@ def main(argv: list[str] | None = None) -> int:
     # Run
     report = engine.run()
 
+    # Dump artifacts to temp.json
+    import json
+    from axiomtrace.output.report import to_dict
+    report_dict = to_dict(report)
+    Path("temp.json").write_text(
+        json.dumps(report_dict["artifacts"], indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    if not args.quiet:
+        print(f"Wrote {len(report.artifacts)} artifacts to temp.json")
+
     # Output
     json_report = to_json(report)
 
@@ -114,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json_report, encoding="utf-8")
         if not args.quiet:
-            print(f"\nReport written to {args.output}")
+            print(f"Report written to {args.output}")
     else:
         print(json_report)
 
